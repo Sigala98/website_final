@@ -1,0 +1,131 @@
+---
+title: "Project 1"
+author: "Cristian Sigala"
+date: "10/16/2019"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+# 2018 NFL Season
+
+For this firest project, I wanted to anaylize data on the NFL. Ever since I was a child, I have always been invested in the NFL. I love football and the amount of statistics that are involed in it. In these two datasets, I have all 2018 NFL season games with a variety of stats, such as scores, win probability, ELO rating, and much more all coming from FiveThirtyEight. In the next dataset, I have the weather patterns in the respective stadiums at the time of play. This dataset contains wind mph, wind direction, temperature, and stadium. Some potential associations I can encounter are that certain teams have an optimal temerature/windspeed that gives them the most wins along with which stadium aquire the most points. 
+
+##Data
+```{R}
+
+weather <- read.csv("~/Desktop/Weather NFL.csv")
+season18 <- read.csv("~/Desktop/2018 NFL season.csv")
+glimpse(season18)
+glimpse(weather)
+```
+
+##Tidying Data
+First step is to create a unique identification variable that both sets have in common. Each dataset has a column for home and away teams. I use the function unite() in order to combine the two variable to create a unique id that will match the two datasets together. If I tried uniting by any other variable without the created id, then the data wouldn't join correctly since there isnt a unique variable between the two datasets.
+```{R}
+weather %>% unite(id, "team_home", "team_away", remove = F) -> weather
+season18 %>% unite(id, "team1", "team2", remove = F) -> season18
+
+
+```
+##Joining
+Now I will perform a full join to combine the two datasets. Then we will delete columns that are repeated or redudent. 
+```{R}
+full_join(season18,weather) -> nfl2018
+nfl2018 %>% select(-team_home,-team_away,-schedule_date,-schedule_season,-season,-date,-elo1_pre,-elo2_pre,-elo1_post,-elo2_post,-qb1_value_pre,-qb2_value_pre,-qb1_value_post,-qb2_value_post,qb1_game_value,-qb2_game_value,-qbelo1_post,-qbelo2_post,-neutral)-> data
+
+```
+##Wrangling 
+For this fist portion, I will be doing some stats on the Dallas Cowboys. They're my favorite team so I want to see how they match up according to the rest of the league. I will be caluating the average points they made at home and away and compare that to the rest of the league in order to determine if the Dallas Cowboys are playing above or below the average. 
+
+
+```{R}
+data %>% arrange(team1) %>% filter(team1 == "DAL") %>% summarize("PointsMade_Home" = mean(score1))
+
+data %>% arrange(team2) %>% filter(team2 == "DAL") %>% summarize("PointsMade_Away" = mean(score2))
+
+
+data %>% summarize("PointsMade_Home_avgNFL" = mean(score1))
+data %>% summarize("PointsMade_Away_avgNFL" = mean(score2))
+
+data %>% arrange(team1) %>% filter(team1 == "DAL") %>% summarize("PointsAllowed_Home" =mean(score2))
+
+data %>% arrange(team2) %>% filter(team2 == "DAL") %>% summarize("PointsAllowed_Away" =mean(score1))
+```
+
+The average points made at home for the entire NFL are 24.41 and points made away is 22.18. Cowboys make 24.88 points at home and 17.88 points away. This data highlightes that the Dallas Cowboys are just above the average when it comes to scoring at home, however, they're below the average for scoring away. Therefore, the Dallas Cowboys are a better team at home. For fun I decided to see how many points were allowed. At home the defense allowed 18.88 points while away they allowed 22.88. Which furthore supports that the Dallas Cowboys are significantly better at home on both sides of the ball.
+
+```{R}
+summary(data)
+
+data %>% select(elo_prob1,elo_prob2,qbelo1_pre,qbelo2_pre,qb1_adj,qb2_adj,qbelo_prob1,qbelo_prob2,qb1_game_value,score1,score2,weather_temperature,weather_wind_mph) %>% summarise_each(funs(sd = sd))
+
+```
+Here are some of the summary statistics of each of the variables. Some interesting stats would be that the std of scoring at home is 10.75 and scoring away is 9.79.Therefore scoring is relatively close. Which is suprising since every week there seems to be large scoring differentials. The lowest temperature ever played in the 2018 season is 19 degrees F by KC and NE. While the fastest wind MPH is 20 mph, played by the Green Bay Packers and Arizona Cardinals.
+
+
+
+##Visualizing
+```{R}
+ggplot(data = data, aes(x = weather_wind_mph, y = score1, color = team1)) + geom_point(size=1) + geom_line() + ggtitle("NFL Scoring w/ Wind MPH") + ylab("Score") + xlab("Wind MPH") + guides(color = guide_legend(reverse = TRUE)) + theme_minimal()
+
+```
+
+This first graph represents the NFLs team scoring depending on wind speeds. While looking at this graph, there is a clear negative spread between scoring and windspeed. As windspeeds increases scoring decreases. Which makes sense considering that the throws are not as accurate since wind can alter the path. 
+```{R}
+ggplot(data = data, aes(x = weather_temperature, y = score1, color = team1)) + geom_point(size=1) + geom_line() + ggtitle("NFL Scoring w/ Temperature(F)") + ylab("Score") + xlab("Temperature F") + theme_dark()
+
+
+```
+
+
+On this graph we have temperature and scoring. From taking a look at this graph there is no clear trend. The highest scoring games are around the 60-70 mark. Originally I was expecting teams that played in the cold to score less but the data says otherwise. Therefore, there is no clear difference when it comes to temperature and scoring ability in a league. 
+
+```{R}
+ggplot(data, aes(stadium))+ geom_bar(aes(y=score1,fill=team1),
+stat="summary", fun.y="mean")+
+theme(axis.text.x = element_text(angle=45, hjust=1),
+legend.position="none")
+
+
+```
+
+
+This graph represents scoring at each stadium. At first glance it seems that whoever plays at the MetLife stadium must be the best team in league with that amount of scoring. However, that stadium is shared by the New York Giants and New York Jets making the amount of points much higher than the rest. The actual highest scoring stadium would be the Los Angeles Memorial Coliseum home to the LA Rams which were in the superbowl. 
+
+##Dimensionality Reduction
+The first step to reduce the dimensions of this dataset is to create some PCA by selecting all the numerical variables and pumping them into a principle componet. After that we can calculate the eigvalue by squaring the std. After that we are able to plot a PCA graph. 
+```{R}
+data %>% arrange(team1,team2)%>% select_if(is.numeric)%>%scale -> NFLnumbers
+princomp(NFLnumbers) -> NFLPCA
+eigval<-NFLPCA$sdev^2
+varprop=round(eigval/sum(eigval),2)
+
+
+NFLdf<-data.frame(PC1=NFLPCA$scores[,1], PC2=NFLPCA$scores[,2])
+ggplot(NFLdf,aes(PC1, PC2))+geom_point()
+```
+
+
+Looking at this data there is a lot of variance between PC1 and PC2. From this we can see a few extreme points in the data. 
+
+Now we can create a plot of loadings which will show which variables have correlation and how much they contribute to the PCA.
+```{R}
+
+NFLPCA$loadings[1:11,1:2]%>%as.data.frame%>%rownames_to_column%>%
+  ggplot()+geom_hline(aes(yintercept=0),lty=2)+
+  geom_vline(aes(xintercept=0),lty=2)+ylab("PC2")+xlab("PC1")+
+  geom_segment(aes(x=0,y=0,xend=Comp.1,yend=Comp.2),arrow=arrow(),col="BLUE")+
+  geom_label(aes(x=Comp.1*1.1,y=Comp.2*1.1,label=rowname))
+
+```
+
+
+After graphing the individual variables along the PCA we are able to determine the variables that have a greater correlations to each other and how much each contribute to the PCA. Right from the bat we can see that elo prob and qbelo prop are closely related which makes sense since the only difference between the two are the quarterbacks rating being factored in the already determined win probability. What is interesting is that there seems to be a very close relationship between the amount of scoring and the quarterbacks adjusted rating. This validates the elo rating system since the value of a quarterback in this system is closely related to the scoring ability.  
+
+
