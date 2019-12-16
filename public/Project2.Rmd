@@ -1,0 +1,200 @@
+---
+title: "Project 2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(MASS) 
+library(lmtest)
+library(sandwich)
+library(plotROC)
+#library(glmnet)
+
+class_diag<-function(probs,truth){
+ tab<-table(factor(probs>.5,levels=c("FALSE","TRUE")),truth)
+ acc=sum(diag(tab))/sum(tab)
+ sens=tab[2,2]/colSums(tab)[2]
+ spec=tab[1,1]/colSums(tab)[1]
+ ppv=tab[2,2]/rowSums(tab)[2]
+ if(is.numeric(truth)==FALSE & is.logical(truth)==FALSE) truth<-as.numeric(truth)-1
+ #CALCULATE EXACT AUC
+ ord<-order(probs, decreasing=TRUE)
+ probs <- probs[ord]; truth <- truth[ord]
+ TPR=cumsum(truth)/max(1,sum(truth))
+ FPR=cumsum(!truth)/max(1,sum(!truth))
+ dup<-c(probs[-1]>=probs[-length(probs)], FALSE)
+ TPR<-c(0,TPR[!dup],1); FPR<-c(0,FPR[!dup],1)
+ n <- length(TPR)
+ auc<- sum( ((TPR[-1]+TPR[-n])/2) * (FPR[-1]-FPR[-n]) )
+ data.frame(acc,sens,spec,ppv,auc)
+} 
+```
+
+# Pokemon 
+One of my favorite games of all time would have to be is pokemon. At a very basic level it is very engaging to a younger audience who just like the animations and designs of the pokemon. While it also appeals to an older audience since they're tons of data that go in each pokemon and the competitive part of it. In this dataset, includes all pokemon in the game along with some key stats such as their typing,stats, and other data. 
+
+## MANOVA Testing
+With this dataset, I will be performing a MONOVA test in order to determine if there is mean difference between height and weight of a pokemon based on their primary type.
+```{R}
+pokemon <- read.csv("~/Desktop/pokemon.csv")
+pokemon$mega<-as.factor(pokemon$mega)
+man1<-manova(cbind(height_m,weight_kg)~type1, data=pokemon)
+summary(man1)
+```
+
+According to our data, the data was  significant therefore, there was mean difference between weight and height based on typing. 
+
+```{R}
+summary.aov(man1)
+pokemon%>%group_by(type1)%>%summarize(mean(height_m,na.rm=T),mean(weight_kg,na.rm=T))
+
+pairwise.t.test(pokemon$height_m,pokemon$type1,p.adj="none")
+pairwise.t.test(pokemon$weight_kg,pokemon$type1,p.adj="none")
+
+.05/(1+2+49+49)
+```
+After conducting a 2 ANOVA tests we find that both weight and height were both significantly different in mean differences even with the adjusted  p values. After that we used a post-hoc test with an adjusted p value, in order to determine which variables were different based on typing. I found that in the area of height Dragon had the most significant differences with almost each other type. Which makes sense since in the pokemon universe, dragons tended to be the legendary pokemon so therefore, they're usually big and tall. In the area of weight we found that steel and ground both had a lot of significant differences with the rest of the typing. As mentioned before, most legendaries are dragons and therefore the tallest and presummible the heaviest. However, based on this data it sees that the legendaries might be the tallest but are not the heaviest.
+
+## Randomization Test
+Pokemon is a long standing franchise that is constantly getting new games every year. As more titles come out the developers of the game try to introduce new mechanics to enhance parts of the game. During the release of Pokemon X & Y, the developers introduced this new feature called "Mega evolution." Typically in pokemon games a pokemon has two evolutions, this new feature introduced an additional evolution in battle that would last the length of the battle. As a competetive player myself, this new feature was loved by the fans and brought the competitive scene to another level. A large discrepency about mega evolution was to not every pokemon recieved one. The relationship between the pokemon that have a mega evolution and the ones who do not are unknown. 
+
+My initial guess is that the pokemon with the highest total base stats got that extra evolution. In order to test this, I will conduct a randomization test to see if there is any relationship between the variables.
+
+```{R}
+pokemon%>%group_by(mega)%>%summarize(means=mean(base_total)) %>% summarize(`mean_diff:`=diff(means))
+
+
+
+rand_dist<-vector()
+for(i in 1:5000){
+new<-data.frame(time=sample(pokemon$base_total),condition=pokemon$mega)
+rand_dist[i]<-mean(new[new$condition=="1",]$time)-
+ mean(new[new$condition=="0",]$time)}
+
+{hist(rand_dist,main="",ylab=""); abline(v = -204.7756,col="blue")}
+
+
+mean(rand_dist>204.7756)*2
+
+```
+The Ho is that there is no diffrence in base total between the pokemon that have mega evolutions.
+The Ha is that there is a difference in base total between the pokemon taht have mega evolutions.
+The test statistic from this data is 204.7756. When we randomize the base stats the new F statistic is way beyond than the actual F stat. Therefore, concluding that there is in fact a difference in average base stats from the pokemon with mega evolution and the ones without it. 
+
+## Linear Regression
+
+The strength of any preticular pokemon is divided into five stats. Hp,Attack, Sp Attack, Defence, Sp Defence, and speed. Usually, the pokemon with the highest combined stats are very strong and used in competetive. So in an attempt to see any relationships to the base total I will be conducting a linear regression using weight and height as predictor variables.
+```{R}
+pokemon$weight_c<-pokemon$weight_kg-mean(pokemon$weight_kg,na.rm=T)
+pokemon$height_c<-pokemon$height_m-mean(pokemon$height_m,na.rm=T)
+fit1<-lm(base_total~weight_c*height_c, data=pokemon)
+summary(fit1)
+
+
+ggplot(pokemon,aes(height_c,weight_c,color=base_total))+geom_point()
+bptest(fit1)
+
+coeftest(fit1, vcov = vcovHC(fit1))[,1:2]
+
+
+fit2<-lm(base_total~weight_c+height_c, data=pokemon)
+
+anova(fit1,fit2,test="LRT")
+
+
+
+
+```
+439.120 is the predicted value of base_total when weight and height = 0, 0.385 is the slope for weight on base_total while holding height constant,70.157 is the slope for height on base_total while holding weight constant. After conducting a Heteroskedasticity Robust Standard Error test we find that there was no change from the orginal data. Therefore, the SE do not need to be adjusted and heteroskedasticity is assumed. After creating am model without the interaction and comparing the two we conclude that we can reject the null hypothesis. The linear regression without the interaction is better.
+
+## Bootstrapped 
+```{R}
+
+samp_distn<-replicate(5000, {
+ boot_dat<-pokemon[sample(nrow(pokemon),replace=TRUE),]
+ fit3<-lm(base_total~weight_c*height_c,data=boot_dat)
+ coef(fit3)
+})
+
+samp_distn%>%t%>%as.data.frame%>%summarize_all(sd)
+```
+There seems to be a big difference of SE from our original model to the bootstrapped model. It seems as if all the variables SE decreased. 
+
+
+## Logistic Regression Model
+One of the things that Pokemon prides itself in is the ability to create a new world that is seemly similar to reality but contains these creatures. In the natural world, animals that are larger and weight alot tend to be apex organisms that have a lot of power. I want to use linear regression in order to see if those same rules apply to Pokemon.
+
+```{R}
+odds<-function(x)x/(1-x)
+logit<-function(x)log(odds(x))
+
+fit4<-glm(mega~base_total+type1, data=pokemon, family=binomial)
+summary(fit4)
+exp(coeftest(fit4)) %>% round(3)
+```
+After running the linear regression model, I found that base total and type "psychic" are good variables for predicting mega evolutions. For every 1 unit increase in base total, odds of being a mega increase by a factor of 1.022 and for every 1 unit increase of type psychic, odds of being a mega decrease by a factor of 0.156.
+
+
+
+```{R}
+pokemon$prob<-predict(fit4,type="response")
+
+table(predict=as.numeric(pokemon$prob>.5),truth=pokemon$mega)%>%addmargins
+
+```
+For our confusion matrix, I found that sensitivity was 10/43,specificity was 747/758, and precision was 10/21.
+```{R}
+pokemon$logit<-predict(fit4,type="link")
+
+pokemon%>%ggplot()+geom_density(aes(logit,color=mega,fill=mega), alpha=.4)+
+  theme(legend.position=c(.85,.85))+geom_vline(xintercept=0)+xlab("predictor (logit)")
+
+```
+
+```{R}
+pokemon -> data
+sens<-function(p,data=data, y=mega) mean(data[data$mega==1,]$prob>p)
+spec<-function(p,data=data, y=mega) mean(data[data$mega==0,]$prob<p)
+
+TPR<-sapply(seq(0,1,.01),sens,data)
+FPR<-sapply(seq(0,1,.01),spec,data)
+
+ROC1<-data.frame(TPR,FPR,cutoff=seq(0,1,.01))
+
+ROC1%>%ggplot(aes(FPR,TPR))+geom_path(size=1.5)
+
+widths<-diff(ROC1$FPR) #horizontal distances
+heights<-(ROC1$TPR[-1]+ROC1$TPR[-length(ROC1$TPR)])/2 #avg heights
+AUC<-sum(heights*widths) #sum up areas of trapezoids
+AUC
+
+data -> pokemon
+set.seed(1234)
+k=10 
+data1<-pokemon[sample(nrow(pokemon)),] #randomly order rows
+folds<-cut(seq(1:nrow(pokemon)),breaks=k,labels=F) #create folds
+diags<-NULL
+for(i in 1:k){
+ ## Create training and test sets
+ train<-data1[folds!=i,]
+ test<-data1[folds==i,]
+ truth<-test$mega
+ ## Train model on training set
+ fit<-glm(mega~base_total,data=pokemon,family="binomial")
+ probs<-predict(fit,newdata = test,type="response")
+ ## Test model on test set (save all k results)
+ diags<-rbind(diags,class_diag(probs,truth))
+}
+
+apply(diags,2,mean)
+```
+The original AUC from the ROC curve is .9516936. After conducting a k-fold CV, the new values are acc= 0.9363580,sens= 0.2550000, spec= 0.9775398, auc= 0.9398991. As you can tell the AUC in the K-fold had decreased a bit compared to the orginal. Although there was a decrease, both are great models for pokemon getting mega evolutions. 
+
+
+```
+
+
+
+

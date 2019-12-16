@@ -39,5 +39,14 @@ Project 2 Pokemon -Project 2</description>
       <description>2018 NFL Season For this firest project, I wanted to anaylize data on the NFL. Ever since I was a child, I have always been invested in the NFL. I love football and the amount of statistics that are involed in it. In these two datasets, I have all 2018 NFL season games with a variety of stats, such as scores, win probability, ELO rating, and much more all coming from FiveThirtyEight.</description>
     </item>
     
+    <item>
+      <title>Project 2</title>
+      <link>/project2/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/project2/</guid>
+      <description>Pokemon One of my favorite games of all time would have to be is pokemon. At a very basic level it is very engaging to a younger audience who just like the animations and designs of the pokemon. While it also appeals to an older audience since they’re tons of data that go in each pokemon and the competitive part of it. In this dataset, includes all pokemon in the game along with some key stats such as their typing,stats, and other data.</description>
+    </item>
+    
   </channel>
 </rss>
