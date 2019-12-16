@@ -49,9 +49,7 @@ re.findall(r'(?:[0-9a-fA-F]:?){12}',string2)
 ### With the syntax all you got to do is slap them together and voilà! You can now find text within a string !
 
 
-
-
-
+![](/blog/2019-12-15-python_files/python.png)
 
 
 

@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1576514229698.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "1541773459",
+    "id" : "DDE83FE0",
+    "lastKnownWriteTime" : 1576514467,
+    "last_content_update" : 1576514467908,
+    "path" : "~/Desktop/website3/content/blog/2019-12-15-python.Rmd",
+    "project_path" : "content/blog/2019-12-15-python.Rmd",
+    "properties" : {
+        "cursorPosition" : "49,0",
+        "scrollLine" : "38"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}
